@@ -22,8 +22,8 @@ public class ProductController : Controller
     [HttpGet]
     public IActionResult Index()
     {
-        IEnumerable<Product> product = _unitOfWork.Product.GetAll();
-        return View(product);
+        //IEnumerable<Product> product = _unitOfWork.Product.GetAll();
+        return View();
     }
 
     [HttpGet]
@@ -47,10 +47,12 @@ public class ProductController : Controller
         if (id == null || id == 0)
         {
             // Create product
-            return View(vm);
+            //return View(vm);
         } else
         {
             // Update product
+            vm.Product = _unitOfWork.Product.GetFirstOrDefault(i => i.Id == id);
+            //return View(vm);
         }
 
         return View(vm);
@@ -68,14 +70,33 @@ public class ProductController : Controller
                 var uploads = Path.Combine(wwwRootPath, @"images\products");
                 var extension = Path.GetExtension(file.FileName);
 
+                if(productVM.Product.ImageUrl != null)
+                {
+                    var oldImagePath = Path.Combine(wwwRootPath, productVM.Product.ImageUrl.TrimStart('\\'));
+                    if (System.IO.File.Exists(oldImagePath))
+                    {
+                        System.IO.File.Delete(oldImagePath);
+                    }
+
+                }
+
                 using(var fileStreams = new FileStream(Path.Combine(uploads, fileName+extension), FileMode.Create))
                 {
                     file.CopyTo(fileStreams);
                 }
-                productVM.Product.ImageUrl = @"\images\products" + fileName + extension;
+                
+                productVM.Product.ImageUrl = @"\images\products\" + fileName + extension;
+
+                if (productVM.Product.Id == 0)
+                {
+                    _unitOfWork.Product.Add(productVM.Product);
+                }
+                else
+                {
+                    _unitOfWork.Product.Update(productVM.Product);
+                }
             }
 
-            _unitOfWork.Product.Update(productVM.Product);
             _unitOfWork.Save();
             TempData["success"] = "Product created successfully";
             return RedirectToAction("Index");
@@ -87,37 +108,33 @@ public class ProductController : Controller
 
     }
 
+    #region API CALLS
     [HttpGet]
-    public IActionResult Delete(int? id)
+    public IActionResult GetAll()
     {
-        if (id == null || id == 0)
-        {
-            return NotFound();
-        }
-
-        var product = _unitOfWork.Product.GetFirstOrDefault(u => u.Id == id);
-
-        if (product == null)
-        {
-            return NotFound();
-        }
-
-        return View(product);
+        var productsList = _unitOfWork.Product.GetAll(includeProperties:"Category,CoverType");
+        return Json(new { data = productsList });
     }
 
-    [HttpPost, ActionName("Delete")]
-    public IActionResult DeleteCoverType(int id)
+    [HttpDelete]
+    public IActionResult Delete(int id)
     {
         var product = _unitOfWork.Product.GetFirstOrDefault(u => u.Id == id);
         if (product == null)
         {
-            return NotFound();
+            return Json(new { success = false, message = "Error while deleting" });
+        }
+
+        var oldImagePath = Path.Combine(_hostEnvironment.WebRootPath, product.ImageUrl.TrimStart('\\'));
+        if (System.IO.File.Exists(oldImagePath))
+        {
+            System.IO.File.Delete(oldImagePath);
         }
 
         _unitOfWork.Product.Remove(product);
         _unitOfWork.Save();
-        TempData["success"] = "Cover Type deleted successfully";
-        return RedirectToAction("Index");
+        return Json(new { success = true, message = "Producte delted successfully" });
     }
+    #endregion
 }
 
