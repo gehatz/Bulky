@@ -19,9 +19,21 @@ public class HomeController : Controller
 
     public IActionResult Index()
     {
-        IEnumerable<Product> productList = _unitOfWork.Product.GetAll(includeProperties:"Category,CoverType");
+        IEnumerable<Product> productList = _unitOfWork.Product.GetAll(includeProperties: "Category,CoverType");
         return View(productList);
     }
+
+    public IActionResult Details(int id)
+    {
+        ShoppingCart cart = new()
+        {
+            Count = 1,
+            Product = _unitOfWork.Product.GetFirstOrDefault(i => i.Id == id, includeProperties: "Category,CoverType")
+        };
+
+        return View(cart);
+    }
+
 
     public IActionResult Privacy()
     {
